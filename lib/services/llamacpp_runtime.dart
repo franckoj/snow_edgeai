@@ -36,14 +36,14 @@ class LlamaCppInferenceRuntime implements InferenceRuntime {
         throw RuntimeException('Model file not found: $modelPath');
       }
 
-      // Configure LlamaConfig
+      // Configure LlamaConfig based on user provided usage
       final config = LlamaConfig(
         modelPath: modelPath,
         nThreads: 4,
-        nGpuLayers: model.config['gpuLayers'] as int? ?? 0,
+        nGpuLayers: model.config['gpuLayers'] as int? ?? 0, // 0 = CPU only, -1 = all layers on GPU
         contextSize: model.config['contextLength'] as int? ?? 2048,
         batchSize: 512,
-        useGpu: (model.config['gpuLayers'] as int? ?? 0) > 0,
+        useGpu: (model.config['gpuLayers'] as int? ?? 0) != 0,
         verbose: false,
       );
 
@@ -55,6 +55,16 @@ class LlamaCppInferenceRuntime implements InferenceRuntime {
       _isLoaded = true;
       _currentModel = model;
       _logger.i('Model loaded successfully');
+
+      // Log model info as suggested in usage guide
+      final info = await _llama.getModelInfo();
+      if (info != null) {
+        _logger.i('Model Info:');
+        _logger.i(' - Path: ${info['modelPath']}');
+        _logger.i(' - Parameters: ${info['nParams']}');
+        _logger.i(' - Layers: ${info['nLayers']}');
+        _logger.i(' - Context size: ${info['contextSize']}');
+      }
     } catch (e, stackTrace) {
       _logger.e('Failed to load model', error: e, stackTrace: stackTrace);
       await unload();
@@ -76,9 +86,11 @@ class LlamaCppInferenceRuntime implements InferenceRuntime {
         topK: config.topK,
         maxTokens: config.maxTokens,
         repeatPenalty: config.repeatPenalty,
+        // stopSequences can be added if supported by GenerationConfig
       );
 
       final response = await _llama.generate(params);
+      _logger.i('Generated ${response.tokensGenerated} tokens at ${response.tokensPerSecond.toStringAsFixed(2)} tok/s');
       return response.text;
     } catch (e) {
       _logger.e('Generation failed', error: e);

@@ -13,7 +13,8 @@ dependencies:
   path_provider: ^2.1.1
   just_audio: ^0.10.5
   logger: ^2.0.2
-  flutter_llama: ^1.1.2
+  flutter_llama:
+    path: plugins/flutter_llama
   dio: ^5.9.0
   crypto: ^3.0.7
   path: ^1.9.1
