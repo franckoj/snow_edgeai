@@ -90,18 +90,24 @@ class _AIChatScreenState extends State<AIChatScreen> {
     });
 
     try {
-      // Unload previous model
-      if (_runtime != null) {
-        await _runtime!.unload();
-      }
-
-      // Create appropriate runtime
-      _runtime = model.runtime == RuntimeType.onnx
+      // Create or get appropriate runtime (now using singletons)
+      final newRuntime = model.runtime == RuntimeType.onnx
           ? OnnxInferenceRuntime()
           : LlamaCppInferenceRuntime();
 
-      // Load model
-      await _runtime!.loadModel(model);
+      // If switching runtimes or models, unload the old one
+      if (_runtime != null && _runtime != newRuntime) {
+        await _runtime!.unload();
+      } else if (_runtime != null && _runtime!.currentModel?.id != model.id) {
+        await _runtime!.unload();
+      }
+
+      _runtime = newRuntime;
+
+      // Only load if not already loaded with the same model
+      if (!_runtime!.isLoaded || _runtime!.currentModel?.id != model.id) {
+        await _runtime!.loadModel(model);
+      }
 
       // Save preference
       final prefs = await SharedPreferences.getInstance();
@@ -275,7 +281,7 @@ class _AIChatScreenState extends State<AIChatScreen> {
   void dispose() {
     _questionController.dispose();
     _scrollController.dispose();
-    _runtime?.dispose();
+    // We NO LONGER dispose/unload runtimes here to keep models loaded on back navigation.
     super.dispose();
   }
 

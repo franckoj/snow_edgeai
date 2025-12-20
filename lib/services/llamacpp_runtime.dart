@@ -10,6 +10,12 @@ final _logger = Logger();
 
 /// llama.cpp runtime implementation using flutter_llama
 class LlamaCppInferenceRuntime implements InferenceRuntime {
+  static final LlamaCppInferenceRuntime _instance = LlamaCppInferenceRuntime._internal();
+  
+  LlamaCppInferenceRuntime._internal();
+  
+  factory LlamaCppInferenceRuntime() => _instance;
+
   final FlutterLlama _llama = FlutterLlama.instance;
   ModelInfo? _currentModel;
   bool _isLoaded = false;
@@ -86,7 +92,6 @@ class LlamaCppInferenceRuntime implements InferenceRuntime {
         topK: config.topK,
         maxTokens: config.maxTokens,
         repeatPenalty: config.repeatPenalty,
-        // stopSequences can be added if supported by GenerationConfig
       );
 
       final response = await _llama.generate(params);
@@ -131,7 +136,8 @@ class LlamaCppInferenceRuntime implements InferenceRuntime {
 
   @override
   Future<void> dispose() async {
-    await unload();
+    // We no longer automatic unload in dispose to keep model across screens. 
+    // Usage will be explicit.
   }
 
   Future<String> _getModelPath(ModelInfo model) async {

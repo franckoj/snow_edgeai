@@ -11,6 +11,12 @@ final _logger = Logger();
 
 /// ONNX Runtime implementation (wraps existing llm_helper.dart code)
 class OnnxInferenceRuntime implements InferenceRuntime {
+  static final OnnxInferenceRuntime _instance = OnnxInferenceRuntime._internal();
+  
+  OnnxInferenceRuntime._internal();
+  
+  factory OnnxInferenceRuntime() => _instance;
+
   llm.LLMInference? _model;
   ModelInfo? _currentModel;
 
@@ -117,7 +123,7 @@ class OnnxInferenceRuntime implements InferenceRuntime {
 
   @override
   Future<void> dispose() async {
-    await unload();
+    // We no longer automatic unload in dispose to keep model across screens.
   }
 
   Future<String> _getModelPath(ModelInfo model) async {
