@@ -66,18 +66,40 @@ class ModelManager {
     }
 
     for (final model in _models ?? <ModelInfo>[]) {
-      final runtimeDir = model.runtime == RuntimeType.onnx ? 'onnx' : 'llamacpp';
+      final String runtimeDir;
+      switch (model.runtime) {
+        case RuntimeType.onnx:
+          runtimeDir = 'onnx';
+          break;
+        case RuntimeType.llamaCpp:
+          runtimeDir = 'llamacpp';
+          break;
+        case RuntimeType.tflite:
+          runtimeDir = 'tflite';
+          break;
+      }
       final modelFile = File('${modelsDir.path}/$runtimeDir/${model.filename}');
 
       if (modelFile.existsSync()) {
+        _logger.i('Found downloaded model: ${model.id} at ${modelFile.path}');
         _downloadedModels[model.id] = modelFile;
+      } else {
+        _logger.d('Model not found at expected path: ${modelFile.path}');
       }
     }
   }
 
   /// Check if a model is downloaded
   bool isModelDownloaded(String modelId) {
-    if (_downloadedModels.containsKey(modelId)) return true;
+    if (_downloadedModels.containsKey(modelId)) {
+      final file = _downloadedModels[modelId]!;
+      if (file.existsSync()) {
+        return true;
+      } else {
+        _logger.w('Model in cache but missing on disk: $modelId at ${file.path}');
+        _downloadedModels.remove(modelId);
+      }
+    }
     
     // Check for bundled models
     final model = getModelById(modelId);

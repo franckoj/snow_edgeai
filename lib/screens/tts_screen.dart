@@ -46,46 +46,35 @@ class _TTSScreenState extends State<TTSScreen> {
   @override
   void initState() {
     super.initState();
-    _loadLastModel();
+    _restoreLastModel();
     _setupAudioPlayerListeners();
   }
 
-  Future<void> _loadLastModel() async {
-     // Try to load last selected model
-    final prefs = await SharedPreferences.getInstance();
-    String? lastId = prefs.getString('last_tts_model_id');
-    
-    // Default to bundled model if no preference
-    lastId ??= 'bundled-tts-en';
+  Future<void> _restoreLastModel() async {
+    setState(() => _isLoading = true);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      String? lastId = prefs.getString('last_tts_model_id');
 
-    if (lastId != null) {
-      try {
-        // Ensure catalog is loaded
+      // Default to bundled model if no preference
+      lastId ??= 'bundled-tts-en';
+
+      if (lastId != null) {
         await ModelManager().getAvailableModels();
         final model = ModelManager().getModelById(lastId);
         if (model != null && ModelManager().isModelDownloaded(lastId)) {
-          await _loadSpecificModel(model);
+          setState(() {
+            _loadedModelInfo = model;
+            _status = 'Voice selected: ${model.name}';
+            _isLoading = false;
+          });
           return;
         }
-      } catch (e) {
-        // Model might not exist in catalog or not downloaded
-        logger.w('Failed to load last model: $lastId', error: e);
       }
-    }
-    
-    // If we still haven't loaded anything, try loading the bundled model explicitly
-    try {
-       await ModelManager().getAvailableModels();
-       final bundled = ModelManager().getModelById('bundled-tts-en');
-       if (bundled != null) {
-         await _loadSpecificModel(bundled);
-         return;
-       }
     } catch (e) {
-       logger.e('Failed to load bundled fallback', error: e);
+      logger.w('Failed to restore last model', error: e);
     }
-    
-    // If no model loaded, update status
+
     setState(() {
       _status = 'Please select a voice model';
       _isLoading = false;
@@ -99,7 +88,19 @@ class _TTSScreenState extends State<TTSScreen> {
     );
 
     if (selectedModel != null) {
-      await _loadSpecificModel(selectedModel);
+      // Unload if different
+      if (_loadedModelInfo != null && _loadedModelInfo!.id != selectedModel.id) {
+        await _unloadModels();
+      }
+
+      setState(() {
+        _loadedModelInfo = selectedModel;
+        _status = 'Voice selected: ${selectedModel.name}';
+      });
+
+      // Save preference immediately
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('last_tts_model_id', selectedModel.id);
     }
   }
 
@@ -383,13 +384,55 @@ class _TTSScreenState extends State<TTSScreen> {
               ),
             ],
             
-            // Status Text (Debug)
-            if (_isLoading || _isGenerating) ...[
+            // Status Text & Load Button
+            if (_loadedModelInfo != null) ...[
               const SizedBox(height: AppTheme.spacingMd),
-              Center(
-                child: Text(
-                  _status,
-                  style: Theme.of(context).textTheme.bodyMedium,
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppTheme.spacingLg,
+                  vertical: AppTheme.spacingSm,
+                ),
+                decoration: BoxDecoration(
+                  color: _isLoading
+                      ? AppTheme.primary.withOpacity(0.1)
+                      : (_textToSpeech != null)
+                          ? Colors.green.withOpacity(0.1)
+                          : Colors.orange.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+                ),
+                child: Row(
+                  children: [
+                    if (_isLoading)
+                      const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    if (!_isLoading && _textToSpeech != null)
+                      Icon(Icons.check_circle_rounded,
+                          size: 16, color: Colors.green.shade700),
+                    if (!_isLoading && _textToSpeech == null)
+                      Icon(Icons.info_outline_rounded,
+                          size: 16, color: Colors.orange.shade700),
+                    const SizedBox(width: AppTheme.spacingSm),
+                    Expanded(
+                      child: Text(
+                        _status,
+                        style: Theme.of(context).textTheme.bodyMedium,
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                    if (!_isLoading && _textToSpeech == null)
+                      TextButton.icon(
+                        onPressed: () => _loadSpecificModel(_loadedModelInfo!),
+                        icon: const Icon(Icons.play_arrow_rounded, size: 18),
+                        label: const Text('Load'),
+                        style: TextButton.styleFrom(
+                          visualDensity: VisualDensity.compact,
+                        ),
+                      ),
+                  ],
                 ),
               ),
             ],

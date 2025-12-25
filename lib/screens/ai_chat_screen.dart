@@ -6,6 +6,7 @@ import '../models/model_info.dart';
 import '../services/inference_runtime.dart';
 import '../services/onnx_runtime.dart';
 import '../services/llamacpp_runtime.dart';
+import '../services/tflite_runtime.dart';
 import '../services/model_manager.dart';
 import '../theme/app_theme.dart';
 import '../widgets/chat_message_widget.dart';
@@ -41,10 +42,10 @@ class _AIChatScreenState extends State<AIChatScreen> {
   @override
   void initState() {
     super.initState();
-    _loadLastSelectedModel();
+    _restoreLastSelectedModel();
   }
 
-  Future<void> _loadLastSelectedModel() async {
+  Future<void> _restoreLastSelectedModel() async {
     final prefs = await SharedPreferences.getInstance();
     final modelId = prefs.getString('last_selected_model');
 
@@ -53,7 +54,10 @@ class _AIChatScreenState extends State<AIChatScreen> {
       final model = _modelManager.getModelById(modelId);
 
       if (model != null && _modelManager.isModelDownloaded(modelId)) {
-        await _loadModel(model);
+        setState(() {
+          _selectedModel = model;
+          _status = 'Model selected: ${model.name}';
+        });
       } else {
         _showWelcomeMessage();
       }
@@ -78,7 +82,20 @@ class _AIChatScreenState extends State<AIChatScreen> {
     );
 
     if (model != null) {
-      await _loadModel(model);
+      // Unload previous model when selection changes
+      if (_runtime != null && _runtime!.isLoaded) {
+        await _runtime!.unload();
+      }
+      
+      setState(() {
+        _selectedModel = model;
+        _runtime = null; // Reset runtime for the new selection
+        _status = 'Model selected: ${model.name}';
+      });
+      
+      // Save preference
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('last_selected_model', model.id);
     }
   }
 
@@ -93,7 +110,9 @@ class _AIChatScreenState extends State<AIChatScreen> {
       // Create or get appropriate runtime (now using singletons)
       final newRuntime = model.runtime == RuntimeType.onnx
           ? OnnxInferenceRuntime()
-          : LlamaCppInferenceRuntime();
+          : model.runtime == RuntimeType.tflite
+              ? TfliteInferenceRuntime()
+              : LlamaCppInferenceRuntime();
 
       // If switching runtimes or models, unload the old one
       if (_runtime != null && _runtime != newRuntime) {
@@ -336,7 +355,9 @@ class _AIChatScreenState extends State<AIChatScreen> {
               padding: const EdgeInsets.all(AppTheme.spacingSm),
               color: _isLoading
                   ? AppTheme.primary.withOpacity(0.1)
-                  : Colors.green.withOpacity(0.1),
+                  : (_runtime?.isLoaded ?? false)
+                      ? Colors.green.withOpacity(0.1)
+                      : Colors.orange.withOpacity(0.1),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -346,17 +367,36 @@ class _AIChatScreenState extends State<AIChatScreen> {
                       height: 16,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     ),
-                  if (!_isLoading)
+                  if (!_isLoading && (_runtime?.isLoaded ?? false))
                     Icon(
                       Icons.check_circle_rounded,
                       size: 16,
                       color: Colors.green.shade700,
                     ),
+                  if (!_isLoading && !(_runtime?.isLoaded ?? false))
+                     Icon(
+                      Icons.info_outline_rounded,
+                      size: 16,
+                      color: Colors.orange.shade700,
+                    ),
                   const SizedBox(width: AppTheme.spacingSm),
-                  Text(
-                    _status,
-                    style: Theme.of(context).textTheme.bodyMedium,
+                  Expanded(
+                    child: Text(
+                      _status,
+                      style: Theme.of(context).textTheme.bodyMedium,
+                      textAlign: TextAlign.center,
+                    ),
                   ),
+                  if (!_isLoading && !(_runtime?.isLoaded ?? false))
+                    TextButton.icon(
+                      onPressed: () => _loadModel(_selectedModel!),
+                      icon: const Icon(Icons.play_arrow_rounded, size: 18),
+                      label: const Text('Load'),
+                      style: TextButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                        padding: EdgeInsets.zero,
+                      ),
+                    ),
                 ],
               ),
             ),

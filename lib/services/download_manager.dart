@@ -205,7 +205,18 @@ class DownloadManager {
 
   Future<String> _getModelPath(ModelInfo model) async {
     final dir = await getApplicationDocumentsDirectory();
-    final runtimeDir = model.runtime == RuntimeType.onnx ? 'onnx' : 'llamacpp';
+    final String runtimeDir;
+    switch (model.runtime) {
+      case RuntimeType.onnx:
+        runtimeDir = 'onnx';
+        break;
+      case RuntimeType.llamaCpp:
+        runtimeDir = 'llamacpp';
+        break;
+      case RuntimeType.tflite:
+        runtimeDir = 'tflite';
+        break;
+    }
     return '${dir.path}/models/$runtimeDir/${model.filename}';
   }
 
