@@ -35,7 +35,9 @@ class OnnxInferenceRuntime implements InferenceRuntime {
       _logger.i('Loading ONNX model: ${model.name}');
 
       final bool isBundled = model.config['isBundled'] == true;
-      final modelPath = isBundled ? model.filename : await _getModelPath(model);
+      final modelPath = isBundled 
+          ? 'assets/models/onnx/${model.filename}' 
+          : await _getModelPath(model);
       final vocabPath = model.config['vocabPath'] as String?;
       final maxLength = model.config['contextLength'] as int? ?? 512;
       final vocabSize = model.config['vocabSize'] as int? ?? 32000;

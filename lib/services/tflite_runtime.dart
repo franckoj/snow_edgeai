@@ -36,7 +36,7 @@ class TfliteInferenceRuntime implements InferenceRuntime {
       final isBundled = model.config['isBundled'] == true;
       
       if (isBundled) {
-        final assetPath = 'assets/models/${model.filename}';
+        final assetPath = 'assets/models/tflite/${model.filename}';
         _logger.i('Loading TFLite model from ASSET: $assetPath');
         
         final options = InterpreterOptions();

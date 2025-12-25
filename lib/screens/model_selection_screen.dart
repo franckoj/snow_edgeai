@@ -183,6 +183,10 @@ class _ModelSelectionScreenState extends State<ModelSelectionScreen> {
                 value: RuntimeType.onnx,
                 child: Text('ONNX only'),
               ),
+              const PopupMenuItem(
+                value: RuntimeType.tflite,
+                child: Text('TFLite only'),
+              ),
             ],
           ),
         ],

@@ -32,4 +32,7 @@ flutter:
     - assets/onnx/
     - assets/voice_styles/
     - assets/models/
+    - assets/models/tflite/
+    - assets/models/onnx/
+    - assets/models/llamacpp/
   uses-material-design: true

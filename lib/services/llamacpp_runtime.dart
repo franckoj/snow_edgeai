@@ -35,7 +35,25 @@ class LlamaCppInferenceRuntime implements InferenceRuntime {
       _logger.i('Loading llama.cpp model: ${model.name}');
 
       // Get model path
-      final modelPath = await _getModelPath(model);
+      String modelPath;
+      final bool isBundled = model.config['isBundled'] == true;
+      
+      if (isBundled) {
+        // For bundled Llama models, we expect them to be copied to the documents directory
+        // because the native C++ library cannot read directly from assets.
+        // For now, we will look for it in the same structure: models/llamacpp/
+         final dir = await getApplicationDocumentsDirectory();
+         modelPath = '${dir.path}/models/llamacpp/${model.filename}';
+         
+         if (!await File(modelPath).exists()) {
+             // TODO: Implement asset copying using rootBundle if needed
+             _logger.e('Bundled Llama model not found in documents. It must be copied from assets first.');
+             throw RuntimeException('Bundled model file not found at $modelPath. Loading from assets directly is not supported for LlamaCpp yet. Please ensure the file is in the documents directory.');
+         }
+      } else {
+        modelPath = await _getModelPath(model);
+      }
+      
       final file = File(modelPath);
       
       if (!await file.exists()) {

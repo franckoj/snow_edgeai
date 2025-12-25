@@ -8,6 +8,7 @@ import '../services/onnx_runtime.dart';
 import '../services/llamacpp_runtime.dart';
 import '../services/tflite_runtime.dart';
 import '../services/model_manager.dart';
+import '../services/download_manager.dart';
 import '../theme/app_theme.dart';
 import '../widgets/chat_message_widget.dart';
 import '../widgets/quality_slider.dart';
@@ -26,14 +27,17 @@ class AIChatScreen extends StatefulWidget {
 class _AIChatScreenState extends State<AIChatScreen> {
   final TextEditingController _questionController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  final List<ChatMessage> _messages = [];
-  final ModelManager _modelManager = ModelManager();
-
-  InferenceRuntime? _runtime;
+  
   ModelInfo? _selectedModel;
+  InferenceRuntime? _runtime;
+  
   bool _isLoading = false;
   bool _isGenerating = false;
+  bool _isDownloading = false;
+  double _downloadProgress = 0;
   String _status = 'No model loaded';
+  final List<ChatMessage> _messages = [];
+  final ModelManager _modelManager = ModelManager();
 
   // Generation parameters
   int _maxTokens = 256;
@@ -101,6 +105,15 @@ class _AIChatScreenState extends State<AIChatScreen> {
 
   Future<void> _loadModel(ModelInfo model) async {
     print('DEBUG: AIChatScreen - Starting to load model: ${model.name}');
+    
+    // Check if download is needed
+    final bool isBundled = model.config['isBundled'] == true;
+    if (!isBundled && !ModelManager().isModelDownloaded(model.id)) {
+      logger.i('Model ${model.id} not downloaded. Triggering download...');
+      _startDownload(model);
+      return;
+    }
+
     setState(() {
       _isLoading = true;
       _status = 'Loading ${model.name}...';
@@ -162,6 +175,57 @@ class _AIChatScreenState extends State<AIChatScreen> {
           ),
         );
       }
+    }
+  }
+
+  Future<void> _startDownload(ModelInfo model) async {
+    setState(() {
+      _isDownloading = true;
+      _downloadProgress = 0;
+      _status = 'Downloading ${model.name}...';
+    });
+
+    try {
+      await for (final progress in DownloadManager().downloadModel(model)) {
+        if (!mounted) break;
+        setState(() {
+          _downloadProgress = progress.percentage;
+          _status = 'Downloading ${model.name}: ${progress.percentage.toStringAsFixed(1)}%';
+        });
+      }
+
+      if (mounted) {
+        setState(() {
+          _isDownloading = false;
+          _status = 'Download complete. Loading...';
+        });
+        // Now actually load it
+        await _loadModel(model);
+      }
+    } catch (e) {
+      logger.e('Download failed', error: e);
+      if (mounted) {
+        setState(() {
+          _isDownloading = false;
+          _status = 'Download failed';
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Download failed: $e'),
+            backgroundColor: AppTheme.error,
+          ),
+        );
+      }
+    }
+  }
+
+  void _cancelDownload() {
+    if (_selectedModel != null) {
+      DownloadManager().cancelDownload(_selectedModel!.id);
+      setState(() {
+        _isDownloading = false;
+        _status = 'Download cancelled';
+      });
     }
   }
 
@@ -367,13 +431,21 @@ class _AIChatScreenState extends State<AIChatScreen> {
                       height: 16,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     ),
-                  if (!_isLoading && (_runtime?.isLoaded ?? false))
+                  if (_isDownloading)
+                    SizedBox(
+                      width: 100,
+                      child: LinearProgressIndicator(
+                        value: _downloadProgress / 100,
+                        backgroundColor: AppTheme.primary.withOpacity(0.1),
+                      ),
+                    ),
+                  if (!_isLoading && !_isDownloading && (_runtime?.isLoaded ?? false))
                     Icon(
                       Icons.check_circle_rounded,
                       size: 16,
                       color: Colors.green.shade700,
                     ),
-                  if (!_isLoading && !(_runtime?.isLoaded ?? false))
+                  if (!_isLoading && !_isDownloading && !(_runtime?.isLoaded ?? false))
                      Icon(
                       Icons.info_outline_rounded,
                       size: 16,
@@ -387,7 +459,14 @@ class _AIChatScreenState extends State<AIChatScreen> {
                       textAlign: TextAlign.center,
                     ),
                   ),
-                  if (!_isLoading && !(_runtime?.isLoaded ?? false))
+                  if (!_isLoading && _isDownloading)
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded, size: 18),
+                      onPressed: _cancelDownload,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                    ),
+                  if (!_isLoading && !_isDownloading && !(_runtime?.isLoaded ?? false))
                     TextButton.icon(
                       onPressed: () => _loadModel(_selectedModel!),
                       icon: const Icon(Icons.play_arrow_rounded, size: 18),

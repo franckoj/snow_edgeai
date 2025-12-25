@@ -91,5 +91,5 @@ android/app/google-services-pro.json
 lib/firebase_options.dart
 firebase.json
 /plugins/
-/assets/models/
+/# assets/models/
 /assets/*
