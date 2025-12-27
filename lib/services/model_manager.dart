@@ -75,7 +75,8 @@ class ModelManager {
           runtimeDir = 'llamacpp';
           break;
         case RuntimeType.tflite:
-          runtimeDir = 'tflite';
+        case RuntimeType.litert:
+          runtimeDir = 'litert';
           break;
       }
       final modelFile = File('${modelsDir.path}/$runtimeDir/${model.filename}');

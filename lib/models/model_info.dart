@@ -3,6 +3,7 @@ enum RuntimeType {
   onnx,
   llamaCpp,
   tflite,
+  litert,
 }
 
 /// Model download and load status
@@ -59,6 +60,8 @@ class ModelInfo {
         return 'llama.cpp';
       case RuntimeType.tflite:
         return 'TensorFlow Lite';
+      case RuntimeType.litert:
+        return 'LiteRT';
     }
   }
 
@@ -69,8 +72,8 @@ class ModelInfo {
       description: json['description'] as String,
       runtime: json['runtime'] == 'onnx' 
           ? RuntimeType.onnx 
-          : json['runtime'] == 'tflite'
-              ? RuntimeType.tflite
+          : (json['runtime'] == 'tflite' || json['runtime'] == 'litert')
+              ? RuntimeType.litert
               : RuntimeType.llamaCpp,
       sizeBytes: json['sizeBytes'] as int,
       downloadUrl: json['downloadUrl'] as String,
@@ -87,9 +90,11 @@ class ModelInfo {
       'description': description,
       'runtime': runtime == RuntimeType.onnx 
           ? 'onnx' 
-          : runtime == RuntimeType.tflite 
-              ? 'tflite' 
-              : 'llamacpp',
+          : runtime == RuntimeType.litert 
+              ? 'litert' 
+              : runtime == RuntimeType.tflite
+                  ? 'tflite'
+                  : 'llamacpp',
       'sizeBytes': sizeBytes,
       'downloadUrl': downloadUrl,
       'filename': filename,

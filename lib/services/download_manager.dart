@@ -214,7 +214,8 @@ class DownloadManager {
         runtimeDir = 'llamacpp';
         break;
       case RuntimeType.tflite:
-        runtimeDir = 'tflite';
+      case RuntimeType.litert:
+        runtimeDir = 'litert';
         break;
     }
     return '${dir.path}/models/$runtimeDir/${model.filename}';

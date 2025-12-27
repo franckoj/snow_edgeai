@@ -123,8 +123,8 @@ class _AIChatScreenState extends State<AIChatScreen> {
       // Create or get appropriate runtime (now using singletons)
       final newRuntime = model.runtime == RuntimeType.onnx
           ? OnnxInferenceRuntime()
-          : model.runtime == RuntimeType.tflite
-              ? TfliteInferenceRuntime()
+          : (model.runtime == RuntimeType.tflite || model.runtime == RuntimeType.litert)
+              ? LiteRTInferenceRuntime()
               : LlamaCppInferenceRuntime();
 
       // If switching runtimes or models, unload the old one
